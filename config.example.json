@@ -1,0 +1,14 @@
+{
+  "api": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "",
+    "model": "gpt-4o-mini",
+    "temperature": 0.7,
+    "timeout": 120
+  },
+  "hotkey": "Ctrl+Alt+Space",
+  "topmost": false,
+  "selection_mode": false,
+  "system_prompt": "你是一个简洁、可靠的 AI 助手，请用中文回答。",
+  "window": {"width": 480, "height": 680, "x": null, "y": null}
+}

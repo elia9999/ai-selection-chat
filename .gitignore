@@ -1,0 +1,17 @@
+# 配置与密钥：绝不提交（config.json 可能包含 API Key）
+config.json
+*.bak
+
+# 构建产物
+AI划词助手.exe
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.pyc
+
+# 系统
+.DS_Store
+Thumbs.db
