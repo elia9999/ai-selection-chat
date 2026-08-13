@@ -46,6 +46,13 @@ try:
         return _seq[0]
 
     main.clipboard_sequence = fake_seq
+    # 模拟“用户在别的程序里划词”：用隐形窗口抢占前台，主窗口保持可见但不聚焦
+    dummy = main.tk.Toplevel(root)
+    dummy.overrideredirect(True)
+    dummy.geometry("+50+50")
+    dummy.attributes("-alpha", 0.01)
+    dummy.focus_force()
+    root.update()
     app._handle_selection_event(300, 400)
     deadline = time.time() + 8
     while time.time() < deadline and (
@@ -57,6 +64,8 @@ try:
     assert app.popup.text == "MODE-SELECTION-789", app.popup.text
     assert root.state() == "normal", "划词弹浮窗时主窗口不应消失"
     assert app.popup.win.state() == "normal"
+    dummy.destroy()
+    root.update()
     print("2. 划词完成自动弹浮窗、主窗口不消失: OK")
 
     # 3. 浮窗不会自动消失

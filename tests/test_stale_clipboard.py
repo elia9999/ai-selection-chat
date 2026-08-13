@@ -24,6 +24,13 @@ previous_clip = main.get_clipboard_text()
 try:
     # 1. 剪切板有旧内容，但复制没有发生（序列号不变）→ 不得弹窗
     main.set_clipboard_text("OLD-CLIPBOARD-CONTENT")
+    # 模拟在别的程序划词：隐形窗口抢占前台
+    dummy = main.tk.Toplevel(root)
+    dummy.overrideredirect(True)
+    dummy.geometry("+50+50")
+    dummy.attributes("-alpha", 0.01)
+    dummy.focus_force()
+    root.update()
     main.clipboard_sequence = lambda: 1
     app._handle_selection_event(200, 200)
     deadline = time.time() + 2
@@ -54,6 +61,8 @@ try:
     root.update()
     assert app.popup.text == "FRESH-SELECTION-TEXT", app.popup.text
     assert app.popup.text != "OLD-CLIPBOARD-CONTENT"
+    dummy.destroy()
+    root.update()
     print("2. 复制成功后正常弹出且显示新划词内容: OK")
 
     print("== 剪切板旧内容回归测试通过 ==")

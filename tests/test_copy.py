@@ -28,9 +28,10 @@ try:
 
     # 1b. 回复通栏显示（不再只占左半边），且选中标签已置顶
     assert app.chat.tag_cget("assistant", "rmargin") == "10", app.chat.tag_cget("assistant", "rmargin")
-    assert app.chat.tag_cget("user", "lmargin1") == "10", app.chat.tag_cget("user", "lmargin1")
+    assert app.chat.tag_cget("user", "justify") == "left", app.chat.tag_cget("user", "justify")
+    assert app.chat.tag_cget("user", "lmargin1") == "120", app.chat.tag_cget("user", "lmargin1")
     app.chat.tag_raise("sel")
-    print("1b. 回复通栏显示 + 选中高亮置顶: OK")
+    print("1b. 回复通栏 + 用户气泡左对齐 + 选中高亮置顶: OK")
 
     # 2. 拦截普通输入，放行导航与复制快捷键
     assert app._block_chat_edit(types.SimpleNamespace(keysym="a", state=0)) == "break"

@@ -26,6 +26,7 @@ import urllib.error
 import urllib.request
 
 from win_platform import (
+    ClickAwayWatcher,
     HOTKEY_PRESETS,
     SelectionWatcher,
     HotkeyManager,
@@ -40,6 +41,7 @@ from win_platform import (
     press_ctrl_c,
     real_hwnd,
     set_clipboard_text,
+    set_no_activate,
 )
 
 if getattr(sys, "frozen", False):
@@ -227,6 +229,7 @@ class PopupWindow:
         self.text = ""
         self.win = None
         self._label = None
+        self._click_watcher = ClickAwayWatcher(self.hide, self._popup_rect)
 
     def _ensure(self):
         if self.win is not None:
@@ -240,6 +243,10 @@ class PopupWindow:
         win.attributes("-topmost", True)
         win.configure(bg=BORDER)
         self.win = win
+        try:
+            set_no_activate(int(win.winfo_id()))
+        except Exception:
+            pass
 
         inner = tk.Frame(win, bg=BG2)
         inner.pack(fill="both", expand=True, padx=1, pady=1)
@@ -313,14 +320,30 @@ class PopupWindow:
         win.geometry("%dx%d+%d+%d" % (w, h, x, y))
         win.deiconify()
         win.lift()
-        win.focus_force()
+        self._click_watcher.start()
 
     def hide(self):
+        self._click_watcher.stop()
         if self.win is not None:
             try:
                 self.win.withdraw()
             except tk.TclError:
                 pass
+
+    def _popup_rect(self):
+        if self.win is None:
+            return (0, 0, 0, 0)
+        try:
+            x = self.win.winfo_rootx()
+            y = self.win.winfo_rooty()
+            return (
+                x,
+                y,
+                x + self.win.winfo_width(),
+                y + self.win.winfo_height(),
+            )
+        except tk.TclError:
+            return (0, 0, 0, 0)
 
     def _trigger(self, action):
         self.hide()
@@ -547,6 +570,7 @@ class AiChatApp:
         self.input.grid(row=0, column=0, sticky="ew")
         self.input.bind("<Return>", self._on_return)
         self.input.bind("<Control-Return>", self._on_return)
+        self.input.bind("<Shift-Return>", self._on_return)
 
         # 发送行
         send_row = tk.Frame(self.root, bg=BG)
@@ -569,6 +593,7 @@ class AiChatApp:
         self.test_btn.config(padx=8)
         self.test_btn.grid(row=0, column=3, sticky="e", padx=(0, 6))
         self.send_btn = styled_button(send_row, "发送 (Enter)", self._send, "primary")
+        self.send_btn.config(width=10)
         self.send_btn.grid(row=0, column=4, sticky="e")
 
     def _config_chat_tags(self):
@@ -576,12 +601,12 @@ class AiChatApp:
             "user",
             background=ACCENT_TINT,
             foreground=ACCENT_TEXT,
-            lmargin1=10,
-            lmargin2=10,
+            lmargin1=120,
+            lmargin2=120,
             rmargin=10,
             spacing1=8,
             spacing3=4,
-            justify="right",
+            justify="left",
         )
         self.chat.tag_configure(
             "assistant",
@@ -979,7 +1004,7 @@ class AiChatApp:
 
     # ---------- 发送与回复 ----------
     def _on_return(self, event=None):
-        if event is not None and (event.state & 0x0004):
+        if event is not None and (event.state & (0x0004 | 0x0001)):
             self.input.insert("insert", "\n")
             return "break"
         self._send()
@@ -1025,7 +1050,7 @@ class AiChatApp:
             if not self.busy:
                 return
             dots[0] = (dots[0] + 1) % 4
-            self.send_btn.config(text="思考中" + "." * dots[0])
+            self._update_status("思考中" + "." * dots[0])
             self._busy_timer = self.root.after(320, tick)
 
         self._busy_timer = self.root.after(320, tick)

@@ -376,3 +376,75 @@ def bring_existing_to_front(title="AI 划词助手"):
         user32.ShowWindow(hwnd, 9)  # SW_RESTORE
         user32.SetForegroundWindow(hwnd)
     return bool(hwnd)
+
+
+# ---------------- 浮窗：不抢焦点 + 点击外部关闭 ----------------
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_NOACTIVATE = 0x08000000
+GWL_EXSTYLE = -20
+
+
+def set_no_activate(hwnd):
+    """浮窗不抢占焦点：出现或被点击都不会打断当前程序的操作。"""
+    user32 = ctypes.windll.user32
+    style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+    user32.SetWindowLongW(
+        hwnd, GWL_EXSTYLE, style | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+    )
+
+
+class ClickAwayWatcher:
+    """监听鼠标左键：点击浮窗外部时回调，用于浮窗自动隐藏。"""
+
+    def __init__(self, on_click_away, rect_provider):
+        self.on_click_away = on_click_away
+        self.rect_provider = rect_provider
+        self._thread = None
+        self._tid = None
+        self._proc = None
+        self._hook = None
+
+    def start(self):
+        if self._thread is not None and self._thread.is_alive():
+            return
+
+        def loop():
+            self._tid = threading.get_ident()
+            user32 = ctypes.windll.user32
+
+            def callback(n_code, w_param, l_param):
+                if n_code >= 0 and w_param == WM_LBUTTONDOWN:
+                    try:
+                        pt = ctypes.cast(
+                            l_param, ctypes.POINTER(MSLLHOOKSTRUCT)
+                        ).contents.pt
+                    except Exception:
+                        pt = None
+                    if pt is not None:
+                        x0, y0, x1, y1 = self.rect_provider()
+                        if not (x0 <= pt.x <= x1 and y0 <= pt.y <= y1):
+                            self.on_click_away()
+                return user32.CallNextHookEx(None, n_code, w_param, l_param)
+
+            self._proc = LowLevelMouseProc(callback)
+            self._hook = user32.SetWindowsHookExW(
+                WH_MOUSE_LL, self._proc, None, 0
+            )
+            msg = wintypes.MSG()
+            while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) != 0:
+                pass
+            if self._hook:
+                user32.UnhookWindowsHookEx(self._hook)
+                self._hook = None
+
+        thread = threading.Thread(target=loop, daemon=True)
+        thread.start()
+        self._thread = thread
+
+    def stop(self):
+        thread, tid = self._thread, self._tid
+        self._thread = None
+        self._tid = None
+        if thread is not None and thread.is_alive() and tid:
+            ctypes.windll.user32.PostThreadMessageW(tid, WM_QUIT, 0, 0)
+            thread.join(timeout=1.0)
